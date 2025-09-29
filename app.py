@@ -23,6 +23,12 @@ st.set_page_config(
     layout='wide',
 )
 
+# Dark theme colors (match .streamlit/config.toml)
+DARK_BG = '#0e1117'
+DARK_SECONDARY = '#111318'
+DARK_TEXT = '#FAFAFA'
+
+
 @st.cache_data
 def get_data() -> pd.DataFrame:
     raw_df = pd.read_json(DATA_FILENAME, lines=True)
@@ -55,11 +61,14 @@ def sidebar_controls(df: pd.DataFrame) -> dict:
     stride_input = st.sidebar.number_input('Stride (periods)', min_value=1, value=1, step=1, help='Number of periods to move the window forward for each frame, i.e., how much the window overlaps with the previous frame.')
     visualise_options = ['Platform', 'Conspiracy Classification', 'Cluster ID', 'Theme']
     visualise = st.sidebar.selectbox('Visualise category', options=visualise_options, index=3)
-    point_size = st.sidebar.slider('Point size (px)', min_value=1, max_value=40, value=2)
-    opacity = st.sidebar.slider('Point opacity', min_value=0.05, max_value=1.0, value=0.6, step=0.05)
-    animation_speed = st.sidebar.slider('Animation frame duration (ms)', min_value=100, max_value=5000, value=1000, step=50)
+    # place point size and opacity on the same line
+    animation_speed = st.sidebar.slider('Animation speed (ms)', min_value=50, max_value=5000, value=500, step=50)
+    col_ps, col_op = st.sidebar.columns([1, 1])
+    point_size = col_ps.slider('Point size (px)', min_value=1, max_value=40, value=2)
+    opacity = col_op.slider('Point opacity', min_value=0.05, max_value=1.0, value=0.6, step=0.05)
     
     st.sidebar.markdown('---')
+    st.sidebar.markdown('### Data filters')
     platforms = st.sidebar.multiselect('Platform', options=sorted(df['Platform'].dropna().unique()), default=sorted(df['Platform'].dropna().unique()))
     classifs = st.sidebar.multiselect('Conspiracy Classification', options=sorted(df['Conspiracy Classification'].dropna().unique()), default=sorted(df['Conspiracy Classification'].dropna().unique()))
     clusters = st.sidebar.multiselect('Cluster ID', options=sorted(df['Cluster ID'].dropna().unique()), default=sorted(df['Cluster ID'].dropna().unique()))
@@ -244,19 +253,21 @@ def plot_dashboard(anim_df: pd.DataFrame, frame_labels: list[str], filtered: pd.
         y_max = float(filtered['Y'].max())
         x_pad = (x_max - x_min) * 0.02 if x_max != x_min else 1.0
         y_pad = (y_max - y_min) * 0.02 if y_max != y_min else 1.0
-        fig.update_xaxes(title_text='', row=1, col=1, range=[x_min - x_pad, x_max + x_pad], showticklabels=False, showgrid=False, zeroline=False)
-        fig.update_yaxes(title_text='', row=1, col=1, range=[y_min - y_pad, y_max + y_pad], showticklabels=False, showgrid=False, zeroline=False)
+        fig.update_xaxes(title_text='', row=1, col=1, range=[x_min - x_pad, x_max + x_pad], showticklabels=False, showgrid=False, zeroline=False, color=DARK_TEXT)
+        fig.update_yaxes(title_text='', row=1, col=1, range=[y_min - y_pad, y_max + y_pad], showticklabels=False, showgrid=False, zeroline=False, color=DARK_TEXT)
     except Exception:
-        fig.update_xaxes(title_text='', row=1, col=1, showticklabels=False, showgrid=False, zeroline=False)
-        fig.update_yaxes(title_text='', row=1, col=1, showticklabels=False, showgrid=False, zeroline=False)
+        fig.update_xaxes(title_text='', row=1, col=1, showticklabels=False, showgrid=False, zeroline=False, color=DARK_TEXT)
+        fig.update_yaxes(title_text='', row=1, col=1, showticklabels=False, showgrid=False, zeroline=False, color=DARK_TEXT)
     
     try:
         pad = max(1, int(global_max_count * 0.02)) if global_max_count else 1
-        fig.update_xaxes(title_text='count', row=1, col=2, showticklabels=True, range=[0, global_max_count + pad], showgrid=False, zeroline=False)
+        fig.update_xaxes(title_text='count', row=1, col=2, showticklabels=True, range=[0, global_max_count + pad], showgrid=False, zeroline=False, color=DARK_TEXT)
     except Exception:
-        fig.update_xaxes(title_text='count', row=1, col=2, showticklabels=True, showgrid=False, zeroline=False)
+        fig.update_xaxes(title_text='count', row=1, col=2, showticklabels=True, showgrid=False, zeroline=False, color=DARK_TEXT)
     
-    fig.update_yaxes(automargin=True, row=1, col=2, showticklabels=True, title_text='', showgrid=False)
+    fig.update_yaxes(automargin=True, row=1, col=2, showticklabels=True, title_text='', showgrid=False, color=DARK_TEXT)
+    # overall figure dark background (use same bg for plot and paper to match Streamlit dark theme)
+    fig.update_layout(plot_bgcolor=DARK_BG, paper_bgcolor=DARK_BG, font_color=DARK_TEXT)
     steps = [
         dict(method='animate', args=[[lbl], dict(mode='immediate', frame=dict(duration=int(animation_speed), redraw=True), transition=dict(duration=0))], label=lbl)
         for lbl in frame_labels
