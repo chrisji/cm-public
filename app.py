@@ -290,7 +290,7 @@ def plot_dashboard(anim_df: pd.DataFrame, frame_labels: list[str], filtered: pd.
         )
     ]
     fig.update_layout(height=700, updatemenus=updatemenus, sliders=sliders, margin=dict(t=100))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 def main():
