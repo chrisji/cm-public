@@ -17,6 +17,14 @@ DATA_FIELD_RENAMES = {
     'mapping_y': 'Y'
 }
 
+DASHBOARD_DESCRIPTION = """
+This dashboard provides an interactive visualisation of Estonian Facebook and Telegram messages posted from January 2020 to November 2023, focusing on conspiracy-related content. The data was collected from public groups and channels that discuss conspiracy theories.
+
+Messages were processed via natural language processing (NLP) techniques to (a) infer their relevance to conspiracy theory discourse and (b) assign thematic categories. Relevant messages are further represented in two-dimensions using a dimensionality reduction technique that attempts to preserve the semantic relationships (i.e., two messages that are visusally close share similar meanings). A total of 56,290 messages are included in the visualisation.
+
+The visualisation provides an interactive animation of how messagaging and the thematic categories change over time. Animation Controls can be used to change the speed, granularity / smoothing, and category being displayed, and Data Filters can be used to focus in on specific thematic categories, conspiracy theory relevancy, and platforms.
+"""
+
 st.set_page_config(
     page_title='Conspiracy Mapping Dashboard',
     page_icon=':frame_with_picture:',
@@ -299,7 +307,7 @@ def main():
     filtered, period_order = filter_data(df, controls)
     anim_df, frame_labels = build_animation_df(filtered, period_order, controls['window_size_input'], controls['stride_input'])
     st.title('Conspiracy Mapping')
-    st.write('Use the sidebar to filter data and control the animation and styling.')
+    st.markdown(DASHBOARD_DESCRIPTION)
     frames_available = frame_labels if frame_labels else (sorted(anim_df['_frame_label'].unique().tolist()) if '_frame_label' in anim_df.columns else [])
     plot_dashboard(anim_df, frames_available, filtered, controls)
 
