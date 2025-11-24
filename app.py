@@ -31,11 +31,23 @@ st.set_page_config(
     layout='wide',
 )
 
+
 # Dark theme colors (match .streamlit/config.toml)
 DARK_BG = '#0e1117'
 DARK_SECONDARY = '#111318'
 DARK_TEXT = '#FAFAFA'
 
+# Sidebar width constant (in pixels)
+SIDEBAR_WIDTH = 440
+
+st.markdown(f"""
+    <style>
+        [data-testid="stSidebar"] {{
+            min-width: {SIDEBAR_WIDTH}px;
+            max-width: 800px;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
 
 @st.cache_data
 def get_data() -> pd.DataFrame:
@@ -62,25 +74,93 @@ def make_period_series(dates: pd.Series, freq: str) -> pd.Series:
 
 
 def sidebar_controls(df: pd.DataFrame) -> dict:
-    st.sidebar.header('Controls')
-    freq = st.sidebar.selectbox('Time bin for animation', options=['Daily', 'Weekly', 'Monthly'], index=2)
-
-    window_size_input = st.sidebar.number_input('Window size (periods)', min_value=1, value=2, step=1)
-    stride_input = st.sidebar.number_input('Stride (periods)', min_value=1, value=1, step=1, help='Number of periods to move the window forward for each frame, i.e., how much the window overlaps with the previous frame.')
+    st.sidebar.markdown('### Animation Controls')
+    # Responsive layout: stack controls vertically on mobile, horizontally on desktop
+    col_win, col_freq, col_stride = st.sidebar.columns([1, 1, 1])
+    window_size_input = col_win.number_input(
+        'Window Size',
+        min_value=1,
+        value=2,
+        step=1,
+        help="Controls the window of data shown in each frame. For example: `2` results in two months of data shown in each frame if 'Monthly' granularity is selected."
+    )
+    freq = col_freq.selectbox(
+        'Granularity',
+        options=['Daily', 'Weekly', 'Monthly'],
+        index=2,
+        help="The unit of time for creating the data windows for each animation frame."
+    )
+    stride_input = col_stride.number_input(
+        'Stride',
+        min_value=1,
+        value=1,
+        max_value=window_size_input,
+        step=1,
+        help="How far to move the window for each frame (in units of the selected granularity). This helps with smoothing the animation. For example: a stride of `1` with a 2 month window moves the start of the window along by one month, and thus overlaps by one month between frames."
+    )
     visualise_options = ['Platform', 'Conspiracy Classification', 'Cluster ID', 'Theme']
-    visualise = st.sidebar.selectbox('Visualise category', options=visualise_options, index=3)
+    visualise = st.sidebar.selectbox(
+        'Visualise category',
+        options=visualise_options,
+        index=3,
+        help='Choose which category to use for coloring points in the 2D plot, and grouping points for the bar plot.'
+    )
     # place point size and opacity on the same line
-    animation_speed = st.sidebar.slider('Animation speed (ms)', min_value=50, max_value=5000, value=500, step=50)
+    animation_speed = st.sidebar.slider(
+        'Animation speed (ms)',
+        min_value=50,
+        max_value=5000,
+        value=500,
+        step=50,
+        help='Set the speed of the animation in milliseconds per frame (lower = faster).'
+    )
     col_ps, col_op = st.sidebar.columns([1, 1])
-    point_size = col_ps.slider('Point size (px)', min_value=1, max_value=40, value=2)
-    opacity = col_op.slider('Point opacity', min_value=0.05, max_value=1.0, value=0.6, step=0.05)
+    point_size = col_ps.slider(
+        'Point size (px)',
+        min_value=1,
+        max_value=40,
+        value=2,
+        help='Adjust the size of points in the scatter plot.'
+    )
+    opacity = col_op.slider(
+        'Point opacity',
+        min_value=0.05,
+        max_value=1.0,
+        value=0.6,
+        step=0.05,
+        help='Adjust the transparency of points (lower = more transparent), which can allow for better visibility when points overlap.'
+    )
     
     st.sidebar.markdown('---')
-    st.sidebar.markdown('### Data filters')
-    platforms = st.sidebar.multiselect('Platform', options=sorted(df['Platform'].dropna().unique()), default=sorted(df['Platform'].dropna().unique()))
-    classifs = st.sidebar.multiselect('Conspiracy Classification', options=sorted(df['Conspiracy Classification'].dropna().unique()), default=sorted(df['Conspiracy Classification'].dropna().unique()))
-    clusters = st.sidebar.multiselect('Cluster ID', options=sorted(df['Cluster ID'].dropna().unique()), default=sorted(df['Cluster ID'].dropna().unique()))
-    themes = st.sidebar.multiselect('Theme', options=sorted(df['Theme'].dropna().unique()), default=sorted(df['Theme'].dropna().unique()))
+    st.sidebar.markdown('### Data Filters')
+    platforms = st.sidebar.multiselect(
+        'Platform',
+        options=sorted(df['Platform'].dropna().unique()),
+        default=sorted(df['Platform'].dropna().unique()),
+        help='Filter messages by source platform (Facebook or Telegram).'
+    )
+    classifs = st.sidebar.multiselect(
+        'Conspiracy Classification',
+        options=sorted(df['Conspiracy Classification'].dropna().unique()),
+        default=sorted(df['Conspiracy Classification'].dropna().unique()),
+        help='Filter messages by their conspiracy relevance.'
+    )
+    
+    themes = st.sidebar.multiselect(
+        'Theme',
+        options=sorted(df['Theme'].dropna().unique()),
+        default=sorted(df['Theme'].dropna().unique()),
+        help='Filter by top-level theme assigned to each message (e.g., Health, Politics, Climate).'
+    )
+    
+    with st.sidebar.expander("Advanced Filters"):
+        clusters = st.multiselect(
+            'Cluster ID',
+            options=sorted(df['Cluster ID'].dropna().unique()),
+            default=sorted(df['Cluster ID'].dropna().unique()),
+            help='Filter by the underlying cluster that messages were assigned to during the semantic clustering process later used for Theme assignment.'
+        )
+        
 
     st.sidebar.markdown('---')
     
