@@ -20,10 +20,29 @@ DATA_FIELD_RENAMES = {
 DASHBOARD_DESCRIPTION = """
 This dashboard provides an interactive visualisation of Estonian Facebook and Telegram messages posted from January 2020 to November 2023, focusing on conspiracy-related content. The data was collected from public groups and channels that discuss conspiracy theories.
 
-Messages were processed via natural language processing (NLP) techniques to (a) infer their relevance to conspiracy theory discourse and (b) assign thematic categories. Relevant messages are further represented in two-dimensions using a dimensionality reduction technique that attempts to preserve the semantic relationships (i.e., two messages that are visually close share similar meanings). A total of 56,290 messages are included in the visualisation.
+Messages were processed via natural language processing (NLP) techniques to (a) infer their relevance to conspiracy theory discourse and (b) assign thematic categories. Messages are considered relevant if they fall into one of two categories: 'Conspiracy Theories' (text that promotes, discusses, or alludes to conspiracy theories) or 'Non-Conspiracy Commentary' (text that discusses socially, politically, or culturally relevant topics but without promoting, discussing, or alluding to conspiracy theories).
 
-The visualisation provides an interactive animation of how messaging and the thematic categories change over time. Animation Controls can be used to change the speed, granularity / smoothing, and category being displayed, and Data Filters can be used to focus in on specific thematic categories, conspiracy theory relevancy, and platforms.
+Relevant messages are further represented in two-dimensions using a dimensionality reduction technique that attempts to preserve the semantic relationships (i.e., two messages that are visually close share similar meanings). A total of 56,290 messages are included in the visualisation.
+
+The visualisation provides an interactive animation of how messaging and the thematic categories changes over time. The animation can be interacted with directly to e.g., zoom into regions, skip to specific time frames, make it fullscreen. Further controls in the sidebar can be used to change the speed, granularity, and category being displayed, and Data Filters can be used to focus in on specific thematic categories, conspiracy theory relevancy, and platforms.
 """
+
+# Theme color map (avoid duplicate colours)
+THEME_COLOR_MAP = {
+    'Estonian politics': "#4ba8ea",
+    'Health (including COVID)': '#ff7f0e',
+    'Russia-Ukraine war': '#d62728',
+    'Global geopolitics': '#2ca02c',
+    'Climate': '#9467bd',
+    'Estonian media': '#8c564b',
+    'Other': '#e0e0e0',
+    'Global financial system': '#e377c2',
+    'Technology': "#00e5ff",
+    'Migration': "#d7d754",
+    'Gender': "#323AAB",
+    'Antisemitism': '#f7b6d2',
+    'Education': "#00b894",
+}
 
 st.set_page_config(
     page_title='Conspiracy Mapping Dashboard',
@@ -118,7 +137,7 @@ def sidebar_controls(df: pd.DataFrame) -> dict:
     point_size = col_ps.slider(
         'Point size (px)',
         min_value=1,
-        max_value=40,
+        max_value=10,
         value=2,
         help='Adjust the size of points in the scatter plot.'
     )
@@ -126,7 +145,7 @@ def sidebar_controls(df: pd.DataFrame) -> dict:
         'Point opacity',
         min_value=0.05,
         max_value=1.0,
-        value=0.6,
+        value=0.65,
         step=0.05,
         help='Adjust the transparency of points (lower = more transparent), which can allow for better visibility when points overlap.'
     )
@@ -305,14 +324,25 @@ def plot_dashboard(anim_df: pd.DataFrame, frame_labels: list[str], filtered: pd.
     opacity = controls['opacity']
     animation_speed = controls['animation_speed']
     color_map = None
-    
-    if color_by in anim_df.columns:
+
+    # Use THEME_COLOR_MAP for Theme coloring
+    if color_by == 'Theme' and 'Theme' in anim_df.columns:
+        cats = sorted(anim_df['Theme'].dropna().unique())
+        color_map = {c: THEME_COLOR_MAP.get(c, '#888') for c in cats}
+    elif color_by in anim_df.columns:
         cats = sorted(anim_df[color_by].dropna().unique())
         color_map = {c: color_seq[i % len(color_seq)] for i, c in enumerate(cats)}
-    
+
     dist_color_map = {}
-    
-    if dist_cat in anim_df.columns:
+    if dist_cat == 'Theme' and 'Theme' in anim_df.columns:
+        dist_cats = sorted(anim_df['Theme'].fillna('Unknown').unique())
+        dist_color_map = {c: THEME_COLOR_MAP.get(c, '#888') for c in dist_cats}
+        try:
+            grp = anim_df.groupby(['_frame_label', dist_cat]).size().unstack(fill_value=0)
+            global_max_count = int(grp.max(axis=1).max()) if not grp.empty else 0
+        except Exception:
+            global_max_count = 0
+    elif dist_cat in anim_df.columns:
         dist_cats = sorted(anim_df[dist_cat].fillna('Unknown').unique())
         dist_color_map = {c: color_seq[i % len(color_seq)] for i, c in enumerate(dist_cats)}
         try:
@@ -387,7 +417,9 @@ def main():
     filtered, period_order = filter_data(df, controls)
     anim_df, frame_labels = build_animation_df(filtered, period_order, controls['window_size_input'], controls['stride_input'])
     st.title('Conspiracy Mapping')
-    st.markdown(DASHBOARD_DESCRIPTION)
+    with st.expander("Overview", expanded=True):
+        st.markdown(DASHBOARD_DESCRIPTION)
+        
     frames_available = frame_labels if frame_labels else (sorted(anim_df['_frame_label'].unique().tolist()) if '_frame_label' in anim_df.columns else [])
     plot_dashboard(anim_df, frames_available, filtered, controls)
 
